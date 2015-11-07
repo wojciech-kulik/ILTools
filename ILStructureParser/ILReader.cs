@@ -1,6 +1,8 @@
-﻿using ObfuscatorService.Models;
+﻿using Microsoft.Build.Utilities;
+using ObfuscatorService.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -16,6 +18,9 @@ namespace ObfuscatorService
         private const string MethodNameEndToken = "(";
         private const string PropertyNameEndToken = "()\r\n";
 
+        private readonly string ildasmPath = ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", TargetDotNetFrameworkVersion.VersionLatest);
+        private readonly string ilasmPath =  ToolLocationHelper.GetPathToDotNetFrameworkFile("ilasm.exe", TargetDotNetFrameworkVersion.VersionLatest);
+
         public List<Assembly> Assemblies { get; private set; }
 
         public ILReader()
@@ -25,7 +30,21 @@ namespace ObfuscatorService
 
         public void AddAssembly(string filePath)
         {
-            Assemblies.Add(new Assembly(filePath) { ILCode = File.ReadAllText(filePath) });
+            Directory.CreateDirectory("ILFiles");
+            var ilFileName = "ILFiles\\" + Path.GetFileNameWithoutExtension(filePath).Replace(' ', '_') + ".il";
+            Process.Start(new ProcessStartInfo()
+            {
+                WindowStyle = ProcessWindowStyle.Hidden,
+                Arguments = String.Format("\"{0}\" /out:{1}", filePath, ilFileName),
+                FileName = ildasmPath
+            });
+
+            while (Process.GetProcessesByName("ildasm").Any())
+            {
+                System.Threading.Tasks.Task.Delay(100).Wait();
+            }
+
+            Assemblies.Add(new Assembly(filePath) { ILCode = File.ReadAllText(ilFileName) });
         }
 
         public void ParseAssemblies()
@@ -59,7 +78,7 @@ namespace ObfuscatorService
             var genericCharIndex = ilCode.IndexOf('`', index, lastIndex - index); 
             if (genericCharIndex != -1)
             {
-                lastIndex = genericCharIndex;
+                lastIndex = genericCharIndex + 2;
             }
             var nameIndex = LastIndexOf(ilCode, ' ', index, lastIndex);
 
@@ -83,6 +102,12 @@ namespace ObfuscatorService
                     var classNameTuple = ExtractClassName(ilCode, index, newLineIndex);
 
                     int classEndIndex = ilCode.IndexOf(String.Format(ClassEndIdentifierFormat, classNameTuple.Item2), index);
+                    if (classEndIndex == -1)
+                    {
+                        startIndex = index + ClassIdentifier.Length;
+                        continue;
+                    }
+
                     var classCode = ilCode.Substring(index, classEndIndex - index);
 
                     var ilClass = new ILClass()
@@ -145,6 +170,62 @@ namespace ObfuscatorService
             }
         }
 
+        private int FindStartOfGenericName(string ilCode, int startIndex, int endIndex)
+        {
+            bool start = false;
+            int counter = 0, i = endIndex;
+
+            while (i > startIndex && (counter > 0 || !start))
+            {
+                if (ilCode[i] == '>')
+                {
+                    start = true;
+                    counter++;
+                }
+                else if (ilCode[i] == '<')
+                {
+                    counter--;
+                }
+
+                --i;
+            }
+
+            while (i > startIndex && ilCode[i] != ' ')
+            {
+                --i;
+            }
+
+            return i + 1;
+        }
+
+        private int FindNameEndIndex(string ilCode, string endPhrase, int startIndex)
+        {
+            int nameEndIndex = ilCode.IndexOf(endPhrase, startIndex);
+            if (nameEndIndex == -1)
+            {
+                return -1;
+            }
+
+            while ((ilCode[nameEndIndex - 1] == ' ' || ilCode[nameEndIndex - 1] == '<') && nameEndIndex != -1)
+            {
+                nameEndIndex = ilCode.IndexOf(endPhrase, nameEndIndex + 1);
+            }
+
+            return nameEndIndex;
+        }
+
+        private int FindNameStartIndex(string ilCode, int startIndex, int endIndex)
+        {
+            if (ilCode[endIndex - 1] == '>')
+            {
+                return FindStartOfGenericName(ilCode, startIndex, endIndex);
+            }
+            else
+            {
+                return LastIndexOf(ilCode, ' ', startIndex, endIndex) + 1;
+            }
+        }
+
         private void ParseUnits(Assembly assembly, ILClass ilClass, string ilCode, int offset, string startPhrase, string endPhrase, List<ILUnit> destination)
         {
             int index, startIndex = 0;
@@ -153,16 +234,20 @@ namespace ObfuscatorService
             {
                 if (!IsInNestedClass(ilClass, index + offset))
                 {
-                    int propertyNameEndIndex = ilCode.IndexOf(endPhrase, index);
-                    string propertyName = ilCode.Substring(index, propertyNameEndIndex - index);
+                    int nameEndIndex = FindNameEndIndex(ilCode, endPhrase, index);
+                    if (nameEndIndex == -1)
+                    {
+                        startIndex = index + startPhrase.Length;
+                        continue;
+                    }
 
-                    int propertyNameStartIndex = propertyName.LastIndexOf(' ') + 1;
-                    propertyName = propertyName.Substring(propertyNameStartIndex);
+                    int nameStartIndex = FindNameStartIndex(ilCode, index, nameEndIndex);
+                    string name = ilCode.Substring(nameStartIndex, nameEndIndex - nameStartIndex);
 
                     destination.Add(new ILUnit()
                     {
-                        Name = propertyName,
-                        NameStartIndex = offset + index + propertyNameStartIndex,
+                        Name = name,
+                        NameStartIndex = offset + nameStartIndex,
                         ParentAssembly = assembly,
                         ParentClass = ilClass
                     });

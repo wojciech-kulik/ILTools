@@ -63,6 +63,11 @@ namespace SimpleILViewer
 
                 foreach (var unitKey in _unitNameToCollectionMap.Keys)
                 {
+                    if (!_unitNameToCollectionMap[unitKey](ilClass).Any())
+                    {
+                        continue;
+                    }
+
                     var unitItem = new TreeViewItem() { Header = unitKey, Tag = _unitKeyToItemTypeMap[unitKey] };
                     item.Items.Add(unitItem);
 
@@ -86,7 +91,7 @@ namespace SimpleILViewer
         {
             OpenFileDialog ofd = new OpenFileDialog()
             {
-                Filter = "Assemblies (*.exe;*.dll)|*.*;*.exe;*.dll",
+                Filter = "Assemblies (*.exe;*.dll)|*.exe;*.dll",
                 Multiselect = true
             };
 
