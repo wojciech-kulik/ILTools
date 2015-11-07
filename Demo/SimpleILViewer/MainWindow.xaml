@@ -4,9 +4,31 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SimpleILViewer"
+        xmlns:conv="clr-namespace:SimpleILViewer.Converters"
         mc:Ignorable="d"
         Background="Black"
-        Title="Simple IL Viewer" Height="423.814" Width="769.276">
+        Foreground="White"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen"
+        Title="Simple IL Viewer" Height="698.33" Width="1240.047" Icon="Images/main.ico">
+    <Window.Resources>
+        <conv:ILUnitToImageConverter x:Key="ILUnitToImageConverter" />
+
+        <Style TargetType="{x:Type TreeViewItem}">
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Image Name="img"  Width="16" Height="16" Stretch="Fill" 
+                                   Source="{Binding ., RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type TreeViewItem}}, Converter={StaticResource ILUnitToImageConverter}}"/>
+                            <TextBlock Text="{Binding}" Margin="5,0"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -16,13 +38,28 @@
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="2*" />
         </Grid.ColumnDefinitions>
-        
+
         <Button Height="30" Content="Load assemblies" Click="Button_Click" />
 
-        <TreeView x:Name="StructureTree" Grid.Row="1" FontSize="15" PreviewMouseDoubleClick="StructureTree_PreviewMouseDoubleClick" />
+        <TreeView x:Name="StructureTree" Grid.Row="1" FontSize="15" Background="#FFEEEEEE" BorderThickness="0"
+                  PreviewMouseDoubleClick="StructureTree_PreviewMouseDoubleClick"
+                  KeyDown="StructureTree_KeyDown"/>
 
-        <ScrollViewer Grid.RowSpan="2" Grid.Column="1">
-            <TextBlock x:Name="tbSourceCode" TextWrapping="NoWrap" Foreground="White" Padding="20" FontSize="13" />
-        </ScrollViewer>
+        <Border Grid.Column="1" Grid.RowSpan="2">
+            <Border.Background>
+                <ImageBrush ImageSource="/Images/binding_dark.png" TileMode="Tile" ViewportUnits="Absolute" Viewport="0,0,46,23"/>
+            </Border.Background>
+        
+            <TextBox x:Name="tbSourceCode" 
+                         IsReadOnly="True" AcceptsReturn="True" AcceptsTab="True" 
+                         Padding="20" Foreground="White" 
+                         TextWrapping="NoWrap" BorderThickness="0"
+                         FontFamily="Consolas" FontSize="15"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <TextBox.Background>
+                    <SolidColorBrush Color="#FF293BB0" Opacity="0.2"/>
+                </TextBox.Background>
+            </TextBox>
+        </Border>
     </Grid>
 </Window>

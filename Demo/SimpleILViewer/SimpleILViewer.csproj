@@ -34,6 +34,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Images\main.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -63,6 +66,8 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Converters\ILUnitToImageConverter.cs" />
+    <Compile Include="ItemType.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -100,6 +105,22 @@
       <Project>{0846b9ef-a6c0-48d4-ab75-36bf40d8ebb6}</Project>
       <Name>ILStructureParser</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\Class.png" />
+    <Resource Include="Images\Field.png" />
+    <Resource Include="Images\Method.png" />
+    <Resource Include="Images\Namespace.png" />
+    <Resource Include="Images\Property.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\Assembly.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\binding_dark.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\main.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

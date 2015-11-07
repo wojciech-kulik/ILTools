@@ -91,14 +91,15 @@ namespace ObfuscatorService
                         NameStartIndex = classNameTuple.Item1 + offset,
                         StartIndex = index + offset,
                         EndIndex = classEndIndex + offset,
-                        ParentAssembly = assembly
+                        ParentAssembly = assembly,
+                        ParentClass = classContainer as ILClass
                     };
                     classContainer.Classes.Add(ilClass);
 
-                    ParseClasses(assembly, ilClass, classCode.Substring(ClassIdentifier.Length), index + ClassIdentifier.Length);
-                    ParseFields(assembly, ilClass, classCode, index);
-                    ParseUnits(assembly, ilClass, classCode, index, PropertyIdentifier, PropertyNameEndToken, ilClass.Properties);
-                    ParseUnits(assembly, ilClass, classCode, index, MethodIdentifier, MethodNameEndToken, ilClass.Methods);
+                    ParseClasses(assembly, ilClass, classCode.Substring(ClassIdentifier.Length), offset + index + ClassIdentifier.Length);
+                    ParseFields(assembly, ilClass, classCode, offset + index);
+                    ParseUnits(assembly, ilClass, classCode, offset + index, PropertyIdentifier, PropertyNameEndToken, ilClass.Properties);
+                    ParseUnits(assembly, ilClass, classCode, offset + index, MethodIdentifier, MethodNameEndToken, ilClass.Methods);
                 }
 
                 startIndex = index + ClassIdentifier.Length;
@@ -135,7 +136,8 @@ namespace ObfuscatorService
                     {
                         Name = fieldName,
                         NameStartIndex = offset + index + fieldNameIndex,
-                        ParentAssembly = assembly
+                        ParentAssembly = assembly,
+                        ParentClass = ilClass
                     });
                 }
 
@@ -161,7 +163,8 @@ namespace ObfuscatorService
                     {
                         Name = propertyName,
                         NameStartIndex = offset + index + propertyNameStartIndex,
-                        ParentAssembly = assembly
+                        ParentAssembly = assembly,
+                        ParentClass = ilClass
                     });
                 }
 
