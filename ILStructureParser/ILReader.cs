@@ -26,6 +26,7 @@ namespace ILStructureParser
         private const string PropertyNameEndToken = "(";
         private const string FieldInitializerToken = " = ";
         private const string FieldInitializerToken2 = " at ";
+        private const string PInvokeToken = "pinvokeimpl";
 
         private readonly string ildasmPath = 
             Microsoft.Build.Utilities.ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", Microsoft.Build.Utilities.TargetDotNetFrameworkVersion.VersionLatest);
@@ -323,6 +324,13 @@ namespace ILStructureParser
             }
 
             while ((ilCode[nameEndIndex - 1] == ' ' || ilCode[nameEndIndex - 1] == '<') && nameEndIndex != -1)
+            {
+                nameEndIndex = ilCode.IndexOf(endPhrase, nameEndIndex + 1);
+            }
+
+            //TODO: do not obfuscate pinvoke
+            // handle pinvokes
+            if (nameEndIndex >= PInvokeToken.Length && ilCode.Substring(nameEndIndex - PInvokeToken.Length, PInvokeToken.Length) == PInvokeToken)
             {
                 nameEndIndex = ilCode.IndexOf(endPhrase, nameEndIndex + 1);
             }
