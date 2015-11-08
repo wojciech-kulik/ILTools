@@ -1,15 +1,21 @@
-﻿using Microsoft.Build.Utilities;
-using ObfuscatorService.Models;
+﻿using ObfuscatorService.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ObfuscatorService
 {
     public class ILReader
     {
+        private class ParallelJob
+        {
+            public int Offset { get; set; }
+            public string ILCode { get; set; }
+        }
+
         private const string FieldIdentifier = ".field";
         private const string PropertyIdentifier = ".property";
         private const string MethodIdentifier = ".method";
@@ -18,7 +24,8 @@ namespace ObfuscatorService
         private const string MethodNameEndToken = "(";
         private const string PropertyNameEndToken = "()\r\n";
 
-        private readonly string ildasmPath = ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", TargetDotNetFrameworkVersion.VersionLatest);
+        private readonly string ildasmPath = 
+            Microsoft.Build.Utilities.ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", Microsoft.Build.Utilities.TargetDotNetFrameworkVersion.VersionLatest);
 
         public List<Assembly> Assemblies { get; private set; }
 
@@ -40,7 +47,7 @@ namespace ObfuscatorService
 
             while (Process.GetProcessesByName("ildasm").Any())
             {
-                System.Threading.Tasks.Task.Delay(100).Wait();
+                Task.Delay(100).Wait();
             }
 
             Assemblies.Add(new Assembly(filePath) { ILCode = File.ReadAllText(ilFileName) });
@@ -50,8 +57,60 @@ namespace ObfuscatorService
         {
             foreach (var assembly in Assemblies)
             {
-                ParseClasses(assembly, assembly, assembly.ILCode);
+                var tasks = new List<Task>();
+                var results = new List<ILClass>();
+
+                // split work
+                var parallelJobs = DivideWorkForParallelProcessing(assembly.ILCode);
+
+                // parallel processing
+                foreach (var job in parallelJobs)
+                {
+                    results.Add(new ILClass());
+                    var result = results.Last();
+                    tasks.Add(Task.Run(() => ParseClasses(assembly, result, job.ILCode, job.Offset)));
+                }
+                Task.WaitAll(tasks.ToArray());
+
+                // merge
+                foreach (var result in results)
+                {
+                    assembly.Classes.AddRange(result.Classes);
+                }
             }
+        }
+
+        private IList<ParallelJob> DivideWorkForParallelProcessing(string ilCode)
+        {
+            var result = new List<ParallelJob>();
+            int offset = 0;
+            int partLength = ilCode.Length / Environment.ProcessorCount;
+
+            for (int i = 0; i < Environment.ProcessorCount - 1 && partLength < ilCode.Length; i++)
+            {
+                // look for the nearest not nested class to split in this place
+                int endIndex = partLength;
+                while ((endIndex = ilCode.IndexOf(ClassIdentifier, endIndex)) != -1)
+                {
+                    if (!IsNestedClass(ilCode, endIndex))
+                    {
+                        break;
+                    }
+                    endIndex += ClassIdentifier.Length;
+                }
+
+                if (endIndex == -1)
+                {
+                    break;
+                }
+
+                result.Add(new ParallelJob() { ILCode = ilCode.Substring(0, endIndex), Offset = offset });
+                ilCode = ilCode.Substring(endIndex);
+                offset += endIndex;
+            }
+            result.Add(new ParallelJob() { ILCode = ilCode, Offset = offset });
+
+            return result;
         }
 
         private int LastIndexOf(string source, char value, int startIndex, int endIndex)
@@ -70,6 +129,12 @@ namespace ObfuscatorService
         private bool IsInNestedClass(IClassContainer classContainer, int index)
         {
             return classContainer.Classes.Any(x => x.NameStartIndex < index && x.EndIndex > index);
+        }
+
+        private bool IsNestedClass(string ilCode, int startIndex)
+        {
+            int newLineIndex = ilCode.IndexOf(Environment.NewLine, startIndex);
+            return ilCode.IndexOf("nested", startIndex, newLineIndex - startIndex) != -1;
         }
 
         private Tuple<int, string> ExtractClassName(string ilCode, int index, int lastIndex)

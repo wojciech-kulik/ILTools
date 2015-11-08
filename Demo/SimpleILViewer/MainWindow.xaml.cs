@@ -50,7 +50,7 @@ namespace SimpleILViewer
         }
 
         private void DisplayStructure(IClassContainer classContainer, ItemCollection parent)
-        {
+        { 
             foreach (var ilClass in classContainer.Classes.OrderBy(x => x.Name))
             {
                 TreeViewItem item = new TreeViewItem() { Header = ilClass.ShortName, DataContext = ilClass, Tag = ItemType.Class };
@@ -135,6 +135,10 @@ namespace SimpleILViewer
                 try
                 {
                     await LoadAssemblies(ofd.FileNames);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Could not parse some assemblies: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 finally
                 {
