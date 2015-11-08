@@ -12,6 +12,8 @@ namespace ILObfuscator
 {
     public class Obfuscator
     {
+        public const string ObfuscatedDirectory = "Obfuscated";
+
         private StringBuilder _currentName = new StringBuilder("a");
         private readonly string ilasmPath =
             Microsoft.Build.Utilities.ToolLocationHelper.GetPathToDotNetFrameworkFile("ilasm.exe", Microsoft.Build.Utilities.TargetDotNetFrameworkVersion.VersionLatest);
@@ -61,34 +63,43 @@ namespace ILObfuscator
             return _currentName.ToString() + suffix;
         }
 
+        private void RecreateDirectory()
+        {
+            if (Directory.Exists(ObfuscatedDirectory))
+            {
+                Directory.Delete(ObfuscatedDirectory, true);
+            }
+            Directory.CreateDirectory(ObfuscatedDirectory);
+        }
+
         private void CompileAssemblies(IList<Assembly> assemblies)
         {
-            if (Directory.Exists("Obfuscated"))
-            {
-                Directory.Delete("Obfuscated", true);
-            }
-            Directory.CreateDirectory("Obfuscated");
+            RecreateDirectory();
 
             foreach (var assembly in assemblies)
             {
-                string resources = string.Empty;
+                string resArguments = string.Empty;
                 string ilPath = ILReader.GetILPath(assembly.FilePath);
-                string res1Name = assembly.FileNameWithoutExt + ".resource";
-                string res2Name = assembly.FileNameWithoutExt + ".res";
+                string dir = Path.GetDirectoryName(ilPath);
+                string resName = String.Format("{0}\\{1}.res", dir, assembly.FileNameWithoutExt);
 
+                // verify if res file is available
+                if (File.Exists(resName))
+                {
+                    resArguments = String.Format("{0} /res:\"{1}\"", resArguments, resName);
+                }
+
+                // save obfuscated IL code
                 File.Delete(ilPath);
                 File.WriteAllText(ilPath, assembly.ILCode);
 
-                foreach (var file in Directory.GetFiles(Path.GetDirectoryName(ilPath)).Where(x => x.EndsWith(res1Name) || x.EndsWith(res2Name)))
-                {
-                    resources = String.Format("{0} /res:\"{1}\"", resources, file);
-                }
-
+                // prepare arguments
                 string arguments = String.Format("{0}\"{1}\" {2}",
                                     assembly.FileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? "/DLL " : String.Empty,
                                     ilPath,
-                                    resources);
+                                    resArguments);
 
+                // run compilation
                 Process.Start(new ProcessStartInfo()
                 {
                     WindowStyle = ProcessWindowStyle.Hidden,
@@ -97,19 +108,27 @@ namespace ILObfuscator
                 });
             }
 
+            // wait until compilation is finished
             while (Process.GetProcessesByName("ilasm").Any())
             {
                 Task.Delay(100).Wait();
             }
 
+            // move assemblies to another directory
+            MoveAssembliesToDirectory(assemblies, ObfuscatedDirectory);
+        }
+
+        private void MoveAssembliesToDirectory(IEnumerable<Assembly> assemblies, string directory)
+        {
             foreach (var assembly in assemblies)
             {
                 string path = Path.GetDirectoryName(ILReader.GetILPath(assembly.FilePath));
 
                 foreach (var file in Directory.GetFiles(path).Where(x => x.EndsWith(".dll") || x.EndsWith(".exe")))
                 {
-                    File.Delete("Obfuscated\\" + Path.GetFileName(file));
-                    File.Move(file, "Obfuscated\\" + Path.GetFileName(file));
+                    var savePath = String.Format("{0}\\{1}", directory, Path.GetFileName(file));
+                    File.Delete(savePath);
+                    File.Move(file, savePath);
                 }
             }
         }

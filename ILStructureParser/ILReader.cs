@@ -16,6 +16,8 @@ namespace ObfuscatorService
             public string ILCode { get; set; }
         }
 
+        public const string ILDirectory = "ILFiles";
+
         private const string FieldIdentifier = ".field";
         private const string PropertyIdentifier = ".property";
         private const string MethodIdentifier = ".method";
@@ -29,15 +31,15 @@ namespace ObfuscatorService
 
         public List<Assembly> Assemblies { get; private set; }
 
-        public static string GetILPath(string assemblyFilePath)
-        {
-            string assemblyName = Path.GetFileNameWithoutExtension(assemblyFilePath).Replace(' ', '_');
-            return String.Format("ILFiles\\{0}\\{0}.il", assemblyName); ;
-        }
-
         public ILReader()
         {
             Assemblies = new List<Assembly>();
+        }
+
+        public static string GetILPath(string assemblyFilePath)
+        {
+            string assemblyName = Path.GetFileNameWithoutExtension(assemblyFilePath).Replace(' ', '_');
+            return String.Format("{0}\\{1}\\{1}.il", ILDirectory, assemblyName); ;
         }
 
         public void AddAssembly(string filePath)

@@ -44,9 +44,9 @@ namespace SimpleILViewer
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (Directory.Exists("ILFiles"))
+            if (Directory.Exists(ILReader.ILDirectory))
             {
-                Directory.Delete("ILFiles", true);
+                Directory.Delete(ILReader.ILDirectory, true);
             }
         }
 
