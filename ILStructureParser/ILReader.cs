@@ -17,14 +17,15 @@ namespace ILStructureParser
         }
 
         public const string ILDirectory = "ILFiles";
-
         private const string FieldIdentifier = ".field";
         private const string PropertyIdentifier = ".property";
         private const string MethodIdentifier = ".method";
         private const string ClassIdentifier = ".class";
         private const string ClassEndIdentifierFormat = "// end of class {0}";
         private const string MethodNameEndToken = "(";
-        private const string PropertyNameEndToken = "()\r\n";
+        private const string PropertyNameEndToken = "(";
+        private const string FieldInitializerToken = " = ";
+        private const string FieldInitializerToken2 = " at ";
 
         private readonly string ildasmPath = 
             Microsoft.Build.Utilities.ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", Microsoft.Build.Utilities.TargetDotNetFrameworkVersion.VersionLatest);
@@ -182,6 +183,22 @@ namespace ILStructureParser
             return new Tuple<int, string>(-1, String.Empty);
         }
 
+        private int FindClassEndIndex(string ilCode, string className, int classStartIndex)
+        {
+            int classEndIndex = ilCode.IndexOf(String.Format(ClassEndIdentifierFormat, className), classStartIndex);
+
+            // Case for pseudo-generic types like nested generic classes, which uses only generic types of parent's class.
+            // End class identifier is "// end of class NestedClass" instead of "// end of class NestedClass<T>"
+            if (classEndIndex == -1 && className.Contains('<'))
+            {
+                var genericTokenIndex = className.IndexOf('<');
+                var tmpName = className.Substring(0, genericTokenIndex);
+                classEndIndex = ilCode.IndexOf(String.Format(ClassEndIdentifierFormat, tmpName), classStartIndex);
+            }
+
+            return classEndIndex;
+        }
+
         private void ParseClasses(Assembly assembly, IClassContainer classContainer, string ilCode, int offset = 0)
         {
             int index, startIndex = 0;
@@ -193,7 +210,7 @@ namespace ILStructureParser
                     int newLineIndex = ilCode.IndexOf(Environment.NewLine, index);
                     var classNameTuple = ExtractClassName(ilCode, index, newLineIndex);
 
-                    int classEndIndex = ilCode.IndexOf(String.Format(ClassEndIdentifierFormat, classNameTuple.Item2), index);
+                    int classEndIndex = FindClassEndIndex(ilCode, classNameTuple.Item2, index);         
                     if (classEndIndex == -1)
                     {
                         startIndex = index + ClassIdentifier.Length;
@@ -222,6 +239,28 @@ namespace ILStructureParser
             }
         }
 
+        private Tuple<int, string> ExtractFieldName(string line)
+        {
+            int fieldNameIndex;
+            string fieldName;
+
+            int initializationIndex = line.IndexOf(FieldInitializerToken);
+            initializationIndex = initializationIndex == -1 ? line.IndexOf(FieldInitializerToken2) : initializationIndex;
+
+            if (initializationIndex != -1)
+            {
+                fieldNameIndex = LastIndexOf(line, ' ', 0, initializationIndex - 1) + 1;
+                fieldName = line.Substring(fieldNameIndex, initializationIndex - fieldNameIndex).Trim();
+            }
+            else
+            {
+                fieldNameIndex = LastIndexOf(line, ' ', 0, line.Length - 1) + 1;
+                fieldName = line.Substring(fieldNameIndex).Trim();
+            }
+
+            return new Tuple<int, string>(fieldNameIndex, fieldName);
+        }
+
         private void ParseFields(Assembly assembly, ILClass ilClass, string ilCode, int offset)
         {
             int index, startIndex = 0;
@@ -230,28 +269,14 @@ namespace ILStructureParser
             {
                 if (!IsInNestedClass(ilClass, index + offset))
                 {
-                    int fieldNameIndex;
-                    string fieldName;
-
                     int newLineIndex = ilCode.IndexOf(Environment.NewLine, index);
                     var line = ilCode.Substring(index, newLineIndex - index);
-
-                    int initializationIndex = line.IndexOf('=');
-                    if (initializationIndex != -1)
-                    {
-                        fieldNameIndex = LastIndexOf(line, ' ', 0, initializationIndex - 2) + 1;
-                        fieldName = line.Substring(fieldNameIndex, initializationIndex - fieldNameIndex - 1).Trim();
-                    }
-                    else
-                    {
-                        fieldNameIndex = LastIndexOf(line, ' ', 0, line.Length - 1) + 1;
-                        fieldName = line.Substring(fieldNameIndex).Trim();
-                    }
+                    var fieldNameTuple = ExtractFieldName(line);
 
                     ilClass.Fields.Add(new ILUnit()
                     {
-                        Name = fieldName,
-                        NameStartIndex = offset + index + fieldNameIndex,
+                        Name = fieldNameTuple.Item2,
+                        NameStartIndex = offset + index + fieldNameTuple.Item1,
                         ParentAssembly = assembly,
                         ParentClass = ilClass
                     });
