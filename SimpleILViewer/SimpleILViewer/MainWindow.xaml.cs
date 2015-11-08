@@ -193,10 +193,12 @@ namespace SimpleILViewer
                 StructureTree.Items.Clear();
                 _namespaces.Clear();
                 ShowAssemblies(_ilReader.Assemblies);
+
+                MessageBox.Show(this, "Obfuscation finished successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Could not obfuscate some assemblies: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, "Could not obfuscate some assemblies:\r\n\r\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -234,7 +236,7 @@ namespace SimpleILViewer
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Could not parse some assemblies: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, "Could not parse some assemblies:\r\n\r\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 finally
                 {

@@ -49,6 +49,7 @@ namespace ILStructureParser
             if (Directory.Exists(dir))
             {
                 Directory.Delete(dir, true);
+                Task.Delay(200).Wait();
             }
             Directory.CreateDirectory(dir);
 

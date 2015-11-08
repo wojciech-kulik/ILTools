@@ -18,24 +18,34 @@ namespace ILObfuscator
         private readonly string ilasmPath =
             Microsoft.Build.Utilities.ToolLocationHelper.GetPathToDotNetFrameworkFile("ilasm.exe", Microsoft.Build.Utilities.TargetDotNetFrameworkVersion.VersionLatest);
 
+        public Dictionary<string, Dictionary<string, string>> ObfuscationMap { get; set; }
+
         public void Obfuscate(IList<Assembly> assemblies)
         {
+            ObfuscationMap = new Dictionary<string, Dictionary<string, string>>();
+
             foreach (var assembly in assemblies)
             {
                 foreach (var ilClass in assembly.Classes.OrderByDescending(x => x.Name.Length))
                 {
-                    ObfuscateName(assemblies, ilClass.Name, GenerateNewName(ilClass.Name));
+                    ObfuscateName(assemblies, assembly, ilClass.Name, GenerateNewName(ilClass.Name));
                 }
             }
 
             CompileAssemblies(assemblies);
         }
 
-        private void ObfuscateName(IList<Assembly> assemblies, string oldName, string newName)
+        private void ObfuscateName(IList<Assembly> assemblies, Assembly assembly, string oldName, string newName)
         {
-            foreach (var assembly in assemblies)
+            if (!ObfuscationMap.ContainsKey(assembly.FileName))
             {
-                assembly.ILCode = assembly.ILCode.Replace(oldName, newName);
+                ObfuscationMap[assembly.FileName] = new Dictionary<string, string>();
+            }
+            ObfuscationMap[assembly.FileName][oldName] = newName;
+
+            foreach (var a in assemblies)
+            {
+                a.ILCode = a.ILCode.Replace(oldName, newName);
             }
         }
 
@@ -68,6 +78,7 @@ namespace ILObfuscator
             if (Directory.Exists(ObfuscatedDirectory))
             {
                 Directory.Delete(ObfuscatedDirectory, true);
+                Task.Delay(200).Wait();
             }
             Directory.CreateDirectory(ObfuscatedDirectory);
         }
@@ -82,6 +93,9 @@ namespace ILObfuscator
                 string ilPath = ILReader.GetILPath(assembly.FilePath);
                 string dir = Path.GetDirectoryName(ilPath);
                 string resName = String.Format("{0}\\{1}.res", dir, assembly.FileNameWithoutExt);
+
+                // fix resources filenames
+                RenameResourcesFiles(assembly.FileName, dir);
 
                 // verify if res file is available
                 if (File.Exists(resName))
@@ -116,6 +130,44 @@ namespace ILObfuscator
 
             // move assemblies to another directory
             MoveAssembliesToDirectory(assemblies, ObfuscatedDirectory);
+
+            // verify compilation
+            VerifyAssemblies(assemblies);
+        }
+
+        private void RenameResourcesFiles(string assemblyFileName, string dir)
+        {
+            foreach (var file in Directory.GetFiles(dir))
+            {
+                var withoutExt = Path.GetFileNameWithoutExtension(file);
+                if (ObfuscationMap.ContainsKey(assemblyFileName) && ObfuscationMap[assemblyFileName].ContainsKey(withoutExt))
+                {
+                    var ext = Path.GetExtension(file);
+                    File.Move(file, String.Format("{0}\\{1}{2}", dir, ObfuscationMap[assemblyFileName][withoutExt], ext));
+                }
+            }
+        }
+
+        private void VerifyAssemblies(IEnumerable<Assembly> assemblies)
+        {
+            var compiledAssemblies = Directory.GetFiles(ObfuscatedDirectory).Select(x => Path.GetFileName(x));
+            var missingFiles = assemblies.Where(x => !compiledAssemblies.Contains(x.FileName)).Select(x => x.FileName);
+
+            if (missingFiles.Any())
+            {
+                StringBuilder missingAssemblies = new StringBuilder();
+
+                foreach (var file in missingFiles)
+                {
+                    if (missingAssemblies.Length != 0)
+                    {
+                        missingAssemblies.Append(", ");
+                    }
+                    missingAssemblies.Append(file);
+                }
+
+                throw new Exception(String.Format("Could not compile some assemblies: {0}", missingAssemblies.ToString()));
+            }
         }
 
         private void MoveAssembliesToDirectory(IEnumerable<Assembly> assemblies, string directory)
