@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ObfuscatorService.Models
+namespace ILStructureParser.Models
 {
     public class ILClass : ILUnit, IClassContainer
     {

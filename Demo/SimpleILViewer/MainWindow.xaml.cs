@@ -1,7 +1,7 @@
 using ILObfuscator;
 using Microsoft.Win32;
-using ObfuscatorService;
-using ObfuscatorService.Models;
+using ILStructureParser;
+using ILStructureParser.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

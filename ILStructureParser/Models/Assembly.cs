@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 
-namespace ObfuscatorService.Models
+namespace ILStructureParser.Models
 {
     public class Assembly : IClassContainer
     {

@@ -1,11 +1,11 @@
-﻿using ObfuscatorService.Models;
+﻿using ILStructureParser.Models;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 using System.IO;
 using System.Diagnostics;
 using System;
-using ObfuscatorService;
+using ILStructureParser;
 using System.Threading.Tasks;
 
 namespace ILObfuscator

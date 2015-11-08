@@ -1,4 +1,4 @@
-﻿namespace ObfuscatorService.Models
+﻿namespace ILStructureParser.Models
 {
     public class ILUnit
     {
