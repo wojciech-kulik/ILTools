@@ -80,6 +80,12 @@
                 </Image>
             </StatusBarItem>
             <StatusBarItem x:Name="LoadingStatus" Content="Loading..." Width="48" HorizontalAlignment="Left" Visibility="Collapsed"/>
+            
+            <StatusBarItem HorizontalAlignment="Right" Margin="0,0,5,0">
+                <Hyperlink NavigateUri="http://wojciechkulik.pl" TextDecorations="None" RequestNavigate="Hyperlink_RequestNavigate">
+                    <Span Foreground="Black">author:</Span> wojciechkulik.pl
+                </Hyperlink>
+            </StatusBarItem>
         </StatusBar>
     </Grid>
 </Window>

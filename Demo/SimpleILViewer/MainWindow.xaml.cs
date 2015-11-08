@@ -3,6 +3,7 @@ using ObfuscatorService;
 using ObfuscatorService.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -55,6 +56,7 @@ namespace SimpleILViewer
             {
                 TreeViewItem item = new TreeViewItem() { Header = ilClass.ShortName, DataContext = ilClass, Tag = ItemType.Class };
 
+                // find a place for this class
                 if (!ilClass.Name.Contains('.'))
                 {
                     parent.Add(item);
@@ -64,6 +66,7 @@ namespace SimpleILViewer
                     GetTreeViewItemForNamespace(ilClass.ParentAssembly, ilClass.Name, parent).Items.Add(item);
                 }
 
+                // add methods, properties and fields
                 foreach (var unitKey in _unitNameToCollectionMap.Keys)
                 {
                     if (!_unitNameToCollectionMap[unitKey](ilClass).Any())
@@ -71,16 +74,19 @@ namespace SimpleILViewer
                         continue;
                     }
 
+                    // grouping item
                     var unitItem = new TreeViewItem() { Header = unitKey, Tag = _unitKeyToItemTypeMap[unitKey] };
                     item.Items.Add(unitItem);
 
+                    // all methods/properties/fields
                     foreach (var ilUnit in _unitNameToCollectionMap[unitKey](ilClass))
                     {
                         var elem = new TreeViewItem() { Header = ilUnit.Name, DataContext = ilUnit, Tag = _unitKeyToItemTypeMap[unitKey] };
                         unitItem.Items.Add(elem);
                     }
                 }
-
+                
+                // add nested classes
                 if (ilClass.Classes.Any())
                 {
                     var nestedClassesItem = new TreeViewItem() { Header = "Nested classes", Tag = ItemType.Class };
@@ -106,12 +112,41 @@ namespace SimpleILViewer
             foreach (var assembly in ilReader.Assemblies.OrderBy(x => x.FileName))
             {
                 var item = new TreeViewItem() { Header = assembly.FileName, Tag = ItemType.Assembly };
-                StructureTree.Items.Add(item);
                 DisplayStructure(assembly, item.Items);
+                StructureTree.Items.Add(item);
+            }
+        }
+
+        private void RemoveNamespacesForAssembly(string assembly)
+        {
+            foreach (var key in _namespaces.Keys.ToList())
+            {
+                if (key.StartsWith(String.Format("[{0}]", assembly)))
+                {
+                    _namespaces.Remove(key);
+                }
+            }
+        }
+
+        private void RemoveDuplicates(string[] fileNames)
+        {
+            foreach (var item in StructureTree.Items.OfType<TreeViewItem>().ToList())
+            {
+                if (fileNames.Any(x => item.Header as string == System.IO.Path.GetFileName(x)))
+                {
+                    StructureTree.Items.Remove(item);
+                    RemoveNamespacesForAssembly(item.Header as string);
+                }
             }
         }
 
         #region UI event handlers
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+            e.Handled = true;
+        }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
@@ -134,6 +169,7 @@ namespace SimpleILViewer
                 LoadingStatus.Visibility = Visibility.Visible;
                 try
                 {
+                    RemoveDuplicates(ofd.FileNames);
                     await LoadAssemblies(ofd.FileNames);
                 }
                 catch (Exception ex)
@@ -189,17 +225,9 @@ namespace SimpleILViewer
             if (e.Key == Key.Delete)
             {
                 e.Handled = true;
-
                 if (StructureTree.SelectedItem != null)
                 {
-                    foreach (var key in _namespaces.Keys.ToList())
-                    {
-                        if (key.StartsWith(String.Format("[{0}]", (StructureTree.SelectedItem as TreeViewItem).Header as string)))
-                        {
-                            _namespaces.Remove(key);
-                        }
-                    }
-
+                    RemoveNamespacesForAssembly((StructureTree.SelectedItem as TreeViewItem).Header as string);
                     StructureTree.Items.Remove(StructureTree.SelectedItem);
                 }
             }
