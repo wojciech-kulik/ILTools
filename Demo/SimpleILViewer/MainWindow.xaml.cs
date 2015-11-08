@@ -4,10 +4,12 @@ using ObfuscatorService.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace SimpleILViewer
 {
@@ -30,6 +32,7 @@ namespace SimpleILViewer
         public MainWindow()
         {
             InitializeComponent();
+            Loaded += MainWindow_Loaded;
         }
 
         private TreeViewItem GetTreeViewItemForNamespace(Assembly assembly, string _namespace, ItemCollection root)
@@ -87,7 +90,36 @@ namespace SimpleILViewer
             }
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private async Task LoadAssemblies(string[] fileNames)
+        {
+            ILReader ilReader = new ILReader();
+
+            await Task.Run(() =>
+            {
+                foreach (string fileName in fileNames)
+                {
+                    ilReader.AddAssembly(fileName);
+                }
+                ilReader.ParseAssemblies();
+            });
+
+            foreach (var assembly in ilReader.Assemblies.OrderBy(x => x.FileName))
+            {
+                var item = new TreeViewItem() { Header = assembly.FileName, Tag = ItemType.Assembly };
+                StructureTree.Items.Add(item);
+                DisplayStructure(assembly, item.Items);
+            }
+        }
+
+        #region UI event handlers
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            (FindResource("LoadingAnimation") as Storyboard).Begin();
+            (FindResource("IconRotationAnimation") as Storyboard).Begin();
+        }
+
+        private async void btnLoadAssemblies_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog()
             {
@@ -97,18 +129,18 @@ namespace SimpleILViewer
 
             if (ofd.ShowDialog(this) == true)
             {
-                ILReader ilReader = new ILReader();
-                foreach (string filePath in ofd.FileNames)
+                btnLoadAssemblies.IsEnabled = false;
+                LoadingIconStatus.Visibility = Visibility.Visible;
+                LoadingStatus.Visibility = Visibility.Visible;
+                try
                 {
-                    ilReader.AddAssembly(filePath);
+                    await LoadAssemblies(ofd.FileNames);
                 }
-                ilReader.ParseAssemblies();
-
-                foreach (var assembly in ilReader.Assemblies.OrderBy(x => x.FileName))
+                finally
                 {
-                    var item = new TreeViewItem() { Header = assembly.FileName, Tag = ItemType.Assembly };
-                    StructureTree.Items.Add(item);
-                    DisplayStructure(assembly, item.Items);
+                    btnLoadAssemblies.IsEnabled = true;
+                    LoadingIconStatus.Visibility = Visibility.Collapsed;
+                    LoadingStatus.Visibility = Visibility.Collapsed;
                 }
             }
         }
@@ -168,5 +200,7 @@ namespace SimpleILViewer
                 }
             }
         }
+
+        #endregion
     }
 }

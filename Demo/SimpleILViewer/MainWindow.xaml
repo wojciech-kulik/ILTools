@@ -27,19 +27,28 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Storyboard x:Key="LoadingAnimation" Storyboard.TargetName="LoadingStatus" Storyboard.TargetProperty="Width">
+            <DoubleAnimation BeginTime="0:0:0" To="58" Duration="0:0:0.75" RepeatBehavior="Forever" />
+        </Storyboard>
+
+        <Storyboard x:Key="IconRotationAnimation" Storyboard.TargetName="LoadingIcon" Storyboard.TargetProperty="(Image.RenderTransform).(RotateTransform.Angle)">
+            <DoubleAnimation BeginTime="0:0:0" To="360" Duration="0:0:1.4" RepeatBehavior="Forever" />
+        </Storyboard>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="2*" />
         </Grid.ColumnDefinitions>
 
-        <Button Height="30" Content="Load assemblies" Click="Button_Click" />
+        <Button x:Name="btnLoadAssemblies" Height="30" Content="Load assemblies" Click="btnLoadAssemblies_Click" />
 
         <TreeView x:Name="StructureTree" Grid.Row="1" FontSize="15" Background="#FFEEEEEE" BorderThickness="0"
                   PreviewMouseDoubleClick="StructureTree_PreviewMouseDoubleClick"
@@ -61,5 +70,16 @@
                 </TextBox.Background>
             </TextBox>
         </Border>
+
+        <StatusBar Grid.Row="2" Height="25" Grid.ColumnSpan="2" BorderBrush="#666" BorderThickness="0,1,0,0">
+            <StatusBarItem x:Name="LoadingIconStatus" Width="25" HorizontalAlignment="Left" Visibility="Collapsed">
+                <Image x:Name="LoadingIcon" Source="/Images/loading.ico" Width="16" Height="16">
+                    <Image.RenderTransform>
+                        <RotateTransform CenterX="8" CenterY="8" Angle="0" />
+                    </Image.RenderTransform>
+                </Image>
+            </StatusBarItem>
+            <StatusBarItem x:Name="LoadingStatus" Content="Loading..." Width="48" HorizontalAlignment="Left" Visibility="Collapsed"/>
+        </StatusBar>
     </Grid>
 </Window>

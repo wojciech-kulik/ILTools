@@ -19,7 +19,6 @@ namespace ObfuscatorService
         private const string PropertyNameEndToken = "()\r\n";
 
         private readonly string ildasmPath = ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", TargetDotNetFrameworkVersion.VersionLatest);
-        private readonly string ilasmPath =  ToolLocationHelper.GetPathToDotNetFrameworkFile("ilasm.exe", TargetDotNetFrameworkVersion.VersionLatest);
 
         public List<Assembly> Assemblies { get; private set; }
 
@@ -108,8 +107,6 @@ namespace ObfuscatorService
                         continue;
                     }
 
-                    var classCode = ilCode.Substring(index, classEndIndex - index);
-
                     var ilClass = new ILClass()
                     {
                         Name = classNameTuple.Item2,
@@ -121,6 +118,7 @@ namespace ObfuscatorService
                     };
                     classContainer.Classes.Add(ilClass);
 
+                    var classCode = ilCode.Substring(index, classEndIndex - index);
                     ParseClasses(assembly, ilClass, classCode.Substring(ClassIdentifier.Length), offset + index + ClassIdentifier.Length);
                     ParseFields(assembly, ilClass, classCode, offset + index);
                     ParseUnits(assembly, ilClass, classCode, offset + index, PropertyIdentifier, PropertyNameEndToken, ilClass.Properties);
