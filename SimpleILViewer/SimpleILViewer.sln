@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleILViewer", "SimpleILV
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ILStructureParser", "..\ILStructureParser\ILStructureParser.csproj", "{0846B9EF-A6C0-48D4-AB75-36BF40D8EBB6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ILObfuscator", "ILObfuscator\ILObfuscator.csproj", "{6BD434A7-485B-45E3-A3B5-938F685BAD6D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ILObfuscator", "..\ILObfuscator\ILObfuscator.csproj", "{6BD434A7-485B-45E3-A3B5-938F685BAD6D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

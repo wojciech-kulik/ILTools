@@ -111,7 +111,7 @@ namespace ILStructureParser
 
             for (int i = 0; i < Environment.ProcessorCount - 1 && partLength < ilCode.Length; i++)
             {
-                // look for the nearest not nested class to split in this place
+                // look for the nearest (to division point) not nested class to split in this place
                 int endIndex = partLength;
                 while ((endIndex = ilCode.IndexOf(ClassIdentifier, endIndex)) != -1)
                 {

@@ -45,7 +45,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\ILStructureParser\ILStructureParser.csproj">
+    <ProjectReference Include="..\ILStructureParser\ILStructureParser.csproj">
       <Project>{0846b9ef-a6c0-48d4-ab75-36bf40d8ebb6}</Project>
       <Name>ILStructureParser</Name>
     </ProjectReference>
