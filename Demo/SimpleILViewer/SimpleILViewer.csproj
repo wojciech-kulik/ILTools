@@ -105,6 +105,10 @@
       <Project>{0846b9ef-a6c0-48d4-ab75-36bf40d8ebb6}</Project>
       <Name>ILStructureParser</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ILObfuscator\ILObfuscator.csproj">
+      <Project>{6bd434a7-485b-45e3-a3b5-938f685bad6d}</Project>
+      <Name>ILObfuscator</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Images\Class.png" />

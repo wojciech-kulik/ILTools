@@ -1,9 +1,11 @@
+using ILObfuscator;
 using Microsoft.Win32;
 using ObfuscatorService;
 using ObfuscatorService.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -30,10 +32,22 @@ namespace SimpleILViewer
         };
         private Dictionary<string, TreeViewItem> _namespaces = new Dictionary<string, TreeViewItem>();
 
+        private ILReader _ilReader = new ILReader();
+
+
         public MainWindow()
         {
             InitializeComponent();
             Loaded += MainWindow_Loaded;
+            Closing += MainWindow_Closing;
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (Directory.Exists("ILFiles"))
+            {
+                Directory.Delete("ILFiles", true);
+            }
         }
 
         private TreeViewItem GetTreeViewItemForNamespace(Assembly assembly, string _namespace, ItemCollection root)
@@ -98,23 +112,15 @@ namespace SimpleILViewer
 
         private async Task LoadAssemblies(string[] fileNames)
         {
-            ILReader ilReader = new ILReader();
-
             await Task.Run(() =>
             {
                 foreach (string fileName in fileNames)
                 {
-                    ilReader.AddAssembly(fileName);
+                    _ilReader.AddAssembly(fileName);
                 }
-                ilReader.ParseAssemblies();
+                _ilReader.ParseAssemblies();
             });
-
-            foreach (var assembly in ilReader.Assemblies.OrderBy(x => x.FileName))
-            {
-                var item = new TreeViewItem() { Header = assembly.FileName, Tag = ItemType.Assembly };
-                DisplayStructure(assembly, item.Items);
-                StructureTree.Items.Add(item);
-            }
+            ShowAssemblies(_ilReader.Assemblies.Skip(_ilReader.Assemblies.Count - fileNames.Length));
         }
 
         private void RemoveNamespacesForAssembly(string assembly)
@@ -136,11 +142,67 @@ namespace SimpleILViewer
                 {
                     StructureTree.Items.Remove(item);
                     RemoveNamespacesForAssembly(item.Header as string);
+                    _ilReader.Assemblies.Remove(_ilReader.Assemblies.FirstOrDefault(x => x.FileName == item.Header as string));
                 }
             }
         }
 
+        private void ShowAssemblies(IEnumerable<Assembly> assemblies)
+        {
+            foreach (var assembly in assemblies.OrderBy(x => x.FileName))
+            {
+                var item = new TreeViewItem() { Header = assembly.FileName, Tag = ItemType.Assembly };
+                DisplayStructure(assembly, item.Items);
+                StructureTree.Items.Add(item);
+            }
+        }
+
+        private void ObfuscateAssemblies()
+        {
+            new Obfuscator().Obfuscate(_ilReader.Assemblies);
+            _ilReader.RefreshAssemblies();         
+        }
+
+        private void SetProgress(bool value)
+        {
+            if (value)
+            {
+                btnLoadAssemblies.IsEnabled = false;
+                btnObfuscate.IsEnabled = false;
+                LoadingIconStatus.Visibility = Visibility.Visible;
+                LoadingStatus.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                btnLoadAssemblies.IsEnabled = true;
+                btnObfuscate.IsEnabled = true;
+                LoadingIconStatus.Visibility = Visibility.Collapsed;
+                LoadingStatus.Visibility = Visibility.Collapsed;
+            }
+        }
+
         #region UI event handlers
+
+        private async void btnObfuscate_Click(object sender, RoutedEventArgs e)
+        {
+            SetProgress(true);
+            try
+            {
+                await Task.Run(() => ObfuscateAssemblies());
+
+                StructureTree.Items.Clear();
+                _namespaces.Clear();
+                ShowAssemblies(_ilReader.Assemblies);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Could not obfuscate some assemblies: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetProgress(false);
+            } 
+        }
 
         private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
         {
@@ -164,9 +226,7 @@ namespace SimpleILViewer
 
             if (ofd.ShowDialog(this) == true)
             {
-                btnLoadAssemblies.IsEnabled = false;
-                LoadingIconStatus.Visibility = Visibility.Visible;
-                LoadingStatus.Visibility = Visibility.Visible;
+                SetProgress(true);
                 try
                 {
                     RemoveDuplicates(ofd.FileNames);
@@ -178,9 +238,7 @@ namespace SimpleILViewer
                 }
                 finally
                 {
-                    btnLoadAssemblies.IsEnabled = true;
-                    LoadingIconStatus.Visibility = Visibility.Collapsed;
-                    LoadingStatus.Visibility = Visibility.Collapsed;
+                    SetProgress(false);
                 }
             }
         }
@@ -227,7 +285,9 @@ namespace SimpleILViewer
                 e.Handled = true;
                 if (StructureTree.SelectedItem != null)
                 {
-                    RemoveNamespacesForAssembly((StructureTree.SelectedItem as TreeViewItem).Header as string);
+                    string assemblyName = (StructureTree.SelectedItem as TreeViewItem).Header as string;
+                    _ilReader.Assemblies.Remove(_ilReader.Assemblies.FirstOrDefault(x => x.FileName == assemblyName));
+                    RemoveNamespacesForAssembly(assemblyName);
                     StructureTree.Items.Remove(StructureTree.SelectedItem);
                 }
             }

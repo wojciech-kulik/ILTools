@@ -31,6 +31,6 @@ namespace ObfuscatorService.Models
 
         public List<ILClass> Classes { get; internal set; }
 
-        public string ILCode { get; internal set; }
+        public string ILCode { get; set; }
     }
 }

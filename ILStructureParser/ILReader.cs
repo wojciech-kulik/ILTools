@@ -29,6 +29,12 @@ namespace ObfuscatorService
 
         public List<Assembly> Assemblies { get; private set; }
 
+        public static string GetILPath(string assemblyFilePath)
+        {
+            string assemblyName = Path.GetFileNameWithoutExtension(assemblyFilePath).Replace(' ', '_');
+            return String.Format("ILFiles\\{0}\\{0}.il", assemblyName); ;
+        }
+
         public ILReader()
         {
             Assemblies = new List<Assembly>();
@@ -36,8 +42,14 @@ namespace ObfuscatorService
 
         public void AddAssembly(string filePath)
         {
-            Directory.CreateDirectory("ILFiles");
-            var ilFileName = "ILFiles\\" + Path.GetFileNameWithoutExtension(filePath).Replace(' ', '_') + ".il";
+            var ilFileName = GetILPath(filePath);
+            var dir = Path.GetDirectoryName(ilFileName);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+            Directory.CreateDirectory(dir);
+
             Process.Start(new ProcessStartInfo()
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
@@ -78,6 +90,15 @@ namespace ObfuscatorService
                     assembly.Classes.AddRange(result.Classes);
                 }
             }
+        }
+
+        public void RefreshAssemblies()
+        {
+            foreach (var assembly in Assemblies)
+            {
+                assembly.Classes = new List<ILClass>();
+            }
+            ParseAssemblies();
         }
 
         private IList<ParallelJob> DivideWorkForParallelProcessing(string ilCode)
@@ -143,6 +164,10 @@ namespace ObfuscatorService
             if (genericCharIndex != -1)
             {
                 lastIndex = genericCharIndex + 2;
+                if (ilCode[lastIndex] == '\'')
+                {
+                    ++lastIndex;
+                }
             }
             var nameIndex = LastIndexOf(ilCode, ' ', index, lastIndex);
 

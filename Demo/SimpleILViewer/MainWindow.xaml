@@ -48,7 +48,14 @@
             <ColumnDefinition Width="2*" />
         </Grid.ColumnDefinitions>
 
-        <Button x:Name="btnLoadAssemblies" Height="30" Content="Load assemblies" Click="btnLoadAssemblies_Click" />
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="btnLoadAssemblies" Height="30" Content="Load assemblies" Click="btnLoadAssemblies_Click" />
+            <Button x:Name="btnObfuscate" Grid.Column="1" Height="30" Content="Obfuscate" Click="btnObfuscate_Click" Margin="-1,0,0,0" />
+        </Grid>
 
         <TreeView x:Name="StructureTree" Grid.Row="1" FontSize="15" Background="#FFEEEEEE" BorderThickness="0"
                   PreviewMouseDoubleClick="StructureTree_PreviewMouseDoubleClick"
