@@ -185,6 +185,12 @@ namespace SimpleILViewer
 
         private async void btnObfuscate_Click(object sender, RoutedEventArgs e)
         {
+            if (StructureTree.Items.Count == 0)
+            {
+                MessageBox.Show(this, "Load some assemblies first.", "No assemblies", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             SetProgress(true);
             try
             {
@@ -193,29 +199,18 @@ namespace SimpleILViewer
                 StructureTree.Items.Clear();
                 _namespaces.Clear();
                 ShowAssemblies(_ilReader.Assemblies);
-
-                MessageBox.Show(this, "Obfuscation finished successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this, "Could not obfuscate some assemblies:\r\n\r\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
             }
             finally
             {
                 SetProgress(false);
-            } 
-        }
+            }
 
-        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
-        {
-            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
-            e.Handled = true;
-        }
-
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
-            (FindResource("LoadingAnimation") as Storyboard).Begin();
-            (FindResource("IconRotationAnimation") as Storyboard).Begin();
+            MessageBox.Show(this, "Obfuscation finished successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private async void btnLoadAssemblies_Click(object sender, RoutedEventArgs e)
@@ -243,6 +238,18 @@ namespace SimpleILViewer
                     SetProgress(false);
                 }
             }
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+            e.Handled = true;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            (FindResource("LoadingAnimation") as Storyboard).Begin();
+            (FindResource("IconRotationAnimation") as Storyboard).Begin();
         }
 
         private void StructureTree_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)

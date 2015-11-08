@@ -8,9 +8,8 @@
         mc:Ignorable="d"
         Background="Black"
         Foreground="White"
-        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
-        Title="Simple IL Viewer" Height="698.33" Width="1240.047" Icon="Images/main.ico">
+        Title="Simple IL Viewer" Height="698.33" Width="1150" Icon="Images/main.ico">
     <Window.Resources>
         <conv:ILUnitToImageConverter x:Key="ILUnitToImageConverter" />
 
