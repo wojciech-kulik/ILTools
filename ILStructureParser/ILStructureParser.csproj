@@ -7,10 +7,11 @@
     <ProjectGuid>{0846B9EF-A6C0-48D4-AB75-36BF40D8EBB6}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ObfuscatorService</RootNamespace>
-    <AssemblyName>ObfuscatorService</AssemblyName>
+    <RootNamespace>ILStructureParser</RootNamespace>
+    <AssemblyName>ILStructureParser</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -41,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ILFMS.cs" />
     <Compile Include="Models\Assembly.cs" />
     <Compile Include="Models\IClassContainer.cs" />
     <Compile Include="Models\ILClass.cs" />

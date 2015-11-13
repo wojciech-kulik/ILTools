@@ -21,14 +21,16 @@ namespace SimpleILViewer
         private Dictionary<string, ItemType> _unitKeyToItemTypeMap = new Dictionary<string, ItemType>()
         {
             { "Fields", ItemType.Field },
+            { "Events", ItemType.Event },
             { "Properties", ItemType.Property },
             { "Methods", ItemType.Method },
         };
-        private Dictionary<string, Func<ILClass, List<ILUnit>>> _unitNameToCollectionMap = new Dictionary<string, Func<ILClass, List<ILUnit>>>()
+        private Dictionary<string, Func<ILClass, LinkedList<ILUnit>>> _unitNameToCollectionMap = new Dictionary<string, Func<ILClass, LinkedList<ILUnit>>>()
         {
             { "Fields", x => x.Fields },
+            { "Events", x => x.Events },
             { "Properties", x => x.Properties },
-            { "Methods", x => x.Methods }
+            { "Methods", x => x.Methods },
         };
         private Dictionary<string, TreeViewItem> _namespaces = new Dictionary<string, TreeViewItem>();
 
@@ -118,8 +120,14 @@ namespace SimpleILViewer
                 {
                     _ilReader.AddAssembly(fileName);
                 }
+
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
                 _ilReader.ParseAssemblies();
+                sw.Stop();
+                File.AppendAllText("time.txt", "Parsing: " + sw.ElapsedMilliseconds.ToString() + "\r\n");
             });
+
             ShowAssemblies(_ilReader.Assemblies.Skip(_ilReader.Assemblies.Count - fileNames.Length));
         }
 

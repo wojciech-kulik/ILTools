@@ -7,6 +7,7 @@
         Class,
         Method,
         Field,
-        Property
+        Property,
+        Event
     }
 }

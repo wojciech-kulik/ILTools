@@ -8,7 +8,7 @@ namespace ILStructureParser.Models
         public Assembly(string filePath)
         {
             FilePath = filePath;
-            Classes = new List<ILClass>();
+            Classes = new LinkedList<ILClass>();
         }
 
         public string FilePath { get; private set; }
@@ -29,7 +29,7 @@ namespace ILStructureParser.Models
             }
         }
 
-        public List<ILClass> Classes { get; internal set; }
+        public LinkedList<ILClass> Classes { get; internal set; }
 
         public string ILCode { get; set; }
     }

@@ -17,18 +17,14 @@ namespace ILStructureParser
         }
 
         public const string ILDirectory = "ILFiles";
-        private const string FieldIdentifier = ".field";
-        private const string PropertyIdentifier = ".property";
-        private const string MethodIdentifier = ".method";
         private const string ClassIdentifier = ".class";
-        private const string ClassEndIdentifierFormat = "// end of class {0}";
         private const string MethodNameEndToken = "(";
         private const string PropertyNameEndToken = "(";
         private const string FieldInitializerToken = " = ";
         private const string FieldInitializerToken2 = " at ";
         private const string PInvokeToken = "pinvokeimpl";
 
-        private readonly string ildasmPath = 
+        private readonly string ildasmPath =
             Microsoft.Build.Utilities.ToolLocationHelper.GetPathToDotNetFrameworkSdkFile("ildasm.exe", Microsoft.Build.Utilities.TargetDotNetFrameworkVersion.VersionLatest);
 
         public List<Assembly> Assemblies { get; private set; }
@@ -60,14 +56,14 @@ namespace ILStructureParser
                 WindowStyle = ProcessWindowStyle.Hidden,
                 Arguments = String.Format("\"{0}\" /out:{1}", filePath, ilFileName),
                 FileName = ildasmPath
-            });
-
-            while (Process.GetProcessesByName("ildasm").Any())
-            {
-                Task.Delay(100).Wait();
-            }
+            }).WaitForExit();
 
             Assemblies.Add(new Assembly(filePath) { ILCode = File.ReadAllText(ilFileName) });
+        }
+
+        public void AddILCode(string assemblyName, string ilCode)
+        {
+            Assemblies.Add(new Assembly(assemblyName) { ILCode = ilCode });
         }
 
         public void ParseAssemblies()
@@ -87,12 +83,16 @@ namespace ILStructureParser
                     var result = results.Last();
                     tasks.Add(Task.Run(() => ParseClasses(assembly, result, job.ILCode, job.Offset)));
                 }
+                
                 Task.WaitAll(tasks.ToArray());
 
                 // merge
                 foreach (var result in results)
                 {
-                    assembly.Classes.AddRange(result.Classes);
+                    foreach (var c in result.Classes)
+                    {
+                        assembly.Classes.AddLast(c);
+                    }
                 }
             }
         }
@@ -101,7 +101,7 @@ namespace ILStructureParser
         {
             foreach (var assembly in Assemblies)
             {
-                assembly.Classes = new List<ILClass>();
+                assembly.Classes = new LinkedList<ILClass>();
             }
             ParseAssemblies();
         }
@@ -139,6 +139,120 @@ namespace ILStructureParser
             return result;
         }
 
+        private bool IsNestedClass(string ilCode, int startIndex)
+        {
+            int newLineIndex = ilCode.IndexOf(Environment.NewLine, startIndex);
+            return ilCode.IndexOf("nested", startIndex, newLineIndex - startIndex) != -1;
+        }
+
+        private void ParseClasses(Assembly assembly, IClassContainer classContainer, string ilCode, int offset = 0)
+        {
+            bool newLine = false;
+            var length = ilCode.Length;
+            var fms = new ILFMS();
+            ILClass currentClass = null;
+
+            for (int i = 0; i < length; i++)
+            {
+                fms.GoToNextState(ilCode[i]);
+                if (fms.CurrentState.IsFinal)
+                {
+                    var ilUnit = new ILUnit() { ParentAssembly = assembly, ParentClass = currentClass };
+
+                    if (fms.CurrentState.StateId == ILFMS.StateIdentifier.Class)
+                    {
+                        int newLineIndex = ilCode.IndexOf(Environment.NewLine, i);
+                        var name = ExtractClassName(ilCode, i, newLineIndex);
+                        currentClass = new ILClass()
+                        {
+                            StartIndex = offset + i - 5,
+                            NameStartIndex = offset + name.Item1,
+                            Name = name.Item2,
+                            ParentAssembly = assembly,
+                            ParentClass = currentClass
+                        };
+
+                        // append class to the parent
+                        if (currentClass.ParentClass != null)
+                        {
+                            currentClass.ParentClass.Classes.AddLast(currentClass);
+                        }
+                        else
+                        {
+                            classContainer.Classes.AddLast(currentClass);
+                        }
+                    }
+                    else if (fms.CurrentState.StateId == ILFMS.StateIdentifier.Method)
+                    {
+                        SetPropertyMethodName(ilUnit, ilCode, i, offset, MethodNameEndToken);
+                        currentClass.Methods.AddLast(ilUnit);
+                    }
+                    else if (fms.CurrentState.StateId == ILFMS.StateIdentifier.Property)
+                    {
+                        SetPropertyMethodName(ilUnit, ilCode, i, offset, PropertyNameEndToken);
+                        currentClass.Properties.AddLast(ilUnit);
+                    }
+                    else if (fms.CurrentState.StateId == ILFMS.StateIdentifier.Field)
+                    {
+                        SetFieldName(ilUnit, ilCode, i, offset);
+                        currentClass.Fields.AddLast(ilUnit);
+                    }
+                    else if (fms.CurrentState.StateId == ILFMS.StateIdentifier.Event)
+                    {
+                        SetEventName(ilUnit, ilCode, i, offset);
+                        currentClass.Events.AddLast(ilUnit);
+                    }
+
+                    fms.Restart();
+                }
+                else if (ilCode[i] == '\n')
+                {
+                    newLine = true;
+                }
+                else if (currentClass != null && ilCode[i] == '{')
+                {
+                    currentClass.BracketsCounter++;
+                    newLine = false;
+                }
+                else if (currentClass != null && ilCode[i] == '}')
+                {
+                    if (--currentClass.BracketsCounter == 0 && newLine) //closing bracket should be in another line then the opening one
+                    {
+                        currentClass.EndIndex = offset + i + 1;
+                        currentClass = currentClass.ParentClass;
+                    }
+                }
+            }
+        }
+
+        private void SetEventName(ILUnit ilUnit, string ilCode, int startIndex, int offset)
+        {
+            int newLineIndex = ilCode.IndexOf(Environment.NewLine, startIndex);
+            var nameStartIndex = LastIndexOf(ilCode, ' ', startIndex, newLineIndex);
+
+            ilUnit.NameStartIndex = offset + nameStartIndex;
+            ilUnit.Name = ilCode.Substring(nameStartIndex, newLineIndex - nameStartIndex);
+        }
+
+        private void SetFieldName(ILUnit ilUnit, string ilCode, int startIndex, int offset)
+        {
+            int newLineIndex = ilCode.IndexOf(Environment.NewLine, startIndex);
+            var line = ilCode.Substring(startIndex, newLineIndex - startIndex);
+            var name = ExtractFieldName(line);
+
+            ilUnit.NameStartIndex = offset + startIndex + name.Item1;
+            ilUnit.Name = name.Item2;
+        }
+
+        private void SetPropertyMethodName(ILUnit ilUnit, string ilCode, int startIndex, int offset, string endPhrase)
+        {
+            var name = GetMethodPropertyName(ilCode, endPhrase, startIndex);
+            ilUnit.NameStartIndex = offset + name.Item1;
+            ilUnit.Name = name.Item2;
+        }
+
+        #region Names Extracting
+
         private int LastIndexOf(string source, char value, int startIndex, int endIndex)
         {
             for (int i = endIndex; i >= startIndex; i--)
@@ -152,20 +266,9 @@ namespace ILStructureParser
             return -1;
         }
 
-        private bool IsInNestedClass(IClassContainer classContainer, int index)
-        {
-            return classContainer.Classes.Any(x => x.NameStartIndex < index && x.EndIndex > index);
-        }
-
-        private bool IsNestedClass(string ilCode, int startIndex)
-        {
-            int newLineIndex = ilCode.IndexOf(Environment.NewLine, startIndex);
-            return ilCode.IndexOf("nested", startIndex, newLineIndex - startIndex) != -1;
-        }
-
         private Tuple<int, string> ExtractClassName(string ilCode, int index, int lastIndex)
         {
-            var genericCharIndex = ilCode.IndexOf('`', index, lastIndex - index); 
+            var genericCharIndex = ilCode.IndexOf('`', index, lastIndex - index);
             if (genericCharIndex != -1)
             {
                 lastIndex = genericCharIndex + 2;
@@ -180,64 +283,19 @@ namespace ILStructureParser
             {
                 return new Tuple<int, string>(nameIndex + 1, ilCode.Substring(nameIndex, lastIndex - nameIndex).Trim());
             }
-
-            return new Tuple<int, string>(-1, String.Empty);
+            return null;
         }
 
-        private int FindClassEndIndex(string ilCode, string className, int classStartIndex)
+        private Tuple<int, string> GetMethodPropertyName(string ilCode, string endPhrase, int index)
         {
-            int classEndIndex = ilCode.IndexOf(String.Format(ClassEndIdentifierFormat, className), classStartIndex);
-
-            // Case for pseudo-generic types like nested generic classes, which uses only generic types of parent's class.
-            // End class identifier is "// end of class NestedClass" instead of "// end of class NestedClass<T>"
-            if (classEndIndex == -1 && className.Contains('<'))
+            int nameEndIndex = FindNameEndIndex(ilCode, endPhrase, index);
+            if (nameEndIndex == -1)
             {
-                var genericTokenIndex = className.IndexOf('<');
-                var tmpName = className.Substring(0, genericTokenIndex);
-                classEndIndex = ilCode.IndexOf(String.Format(ClassEndIdentifierFormat, tmpName), classStartIndex);
+                return null;
             }
 
-            return classEndIndex;
-        }
-
-        private void ParseClasses(Assembly assembly, IClassContainer classContainer, string ilCode, int offset = 0)
-        {
-            int index, startIndex = 0;
-
-            while((index = ilCode.IndexOf(ClassIdentifier, startIndex)) != -1)
-            {
-                if (!IsInNestedClass(classContainer, index + offset))
-                {
-                    int newLineIndex = ilCode.IndexOf(Environment.NewLine, index);
-                    var classNameTuple = ExtractClassName(ilCode, index, newLineIndex);
-
-                    int classEndIndex = FindClassEndIndex(ilCode, classNameTuple.Item2, index);         
-                    if (classEndIndex == -1)
-                    {
-                        startIndex = index + ClassIdentifier.Length;
-                        continue;
-                    }
-
-                    var ilClass = new ILClass()
-                    {
-                        Name = classNameTuple.Item2,
-                        NameStartIndex = classNameTuple.Item1 + offset,
-                        StartIndex = index + offset,
-                        EndIndex = classEndIndex + offset,
-                        ParentAssembly = assembly,
-                        ParentClass = classContainer as ILClass
-                    };
-                    classContainer.Classes.Add(ilClass);
-
-                    var classCode = ilCode.Substring(index, classEndIndex - index);
-                    ParseClasses(assembly, ilClass, classCode.Substring(ClassIdentifier.Length), offset + index + ClassIdentifier.Length);
-                    ParseFields(assembly, ilClass, classCode, offset + index);
-                    ParseUnits(assembly, ilClass, classCode, offset + index, PropertyIdentifier, PropertyNameEndToken, ilClass.Properties);
-                    ParseUnits(assembly, ilClass, classCode, offset + index, MethodIdentifier, MethodNameEndToken, ilClass.Methods);
-                }
-
-                startIndex = index + ClassIdentifier.Length;
-            }
+            int nameStartIndex = FindNameStartIndex(ilCode, index, nameEndIndex);
+            return new Tuple<int, string>(nameStartIndex, ilCode.Substring(nameStartIndex, nameEndIndex - nameStartIndex));
         }
 
         private Tuple<int, string> ExtractFieldName(string line)
@@ -260,31 +318,6 @@ namespace ILStructureParser
             }
 
             return new Tuple<int, string>(fieldNameIndex, fieldName);
-        }
-
-        private void ParseFields(Assembly assembly, ILClass ilClass, string ilCode, int offset)
-        {
-            int index, startIndex = 0;
-
-            while ((index = ilCode.IndexOf(FieldIdentifier, startIndex)) != -1)
-            {
-                if (!IsInNestedClass(ilClass, index + offset))
-                {
-                    int newLineIndex = ilCode.IndexOf(Environment.NewLine, index);
-                    var line = ilCode.Substring(index, newLineIndex - index);
-                    var fieldNameTuple = ExtractFieldName(line);
-
-                    ilClass.Fields.Add(new ILUnit()
-                    {
-                        Name = fieldNameTuple.Item2,
-                        NameStartIndex = offset + index + fieldNameTuple.Item1,
-                        ParentAssembly = assembly,
-                        ParentClass = ilClass
-                    });
-                }
-
-                startIndex = index + FieldIdentifier.Length;
-            }
         }
 
         private int FindStartOfGenericName(string ilCode, int startIndex, int endIndex)
@@ -350,35 +383,6 @@ namespace ILStructureParser
             }
         }
 
-        private void ParseUnits(Assembly assembly, ILClass ilClass, string ilCode, int offset, string startPhrase, string endPhrase, List<ILUnit> destination)
-        {
-            int index, startIndex = 0;
-
-            while ((index = ilCode.IndexOf(startPhrase, startIndex)) != -1)
-            {
-                if (!IsInNestedClass(ilClass, index + offset))
-                {
-                    int nameEndIndex = FindNameEndIndex(ilCode, endPhrase, index);
-                    if (nameEndIndex == -1)
-                    {
-                        startIndex = index + startPhrase.Length;
-                        continue;
-                    }
-
-                    int nameStartIndex = FindNameStartIndex(ilCode, index, nameEndIndex);
-                    string name = ilCode.Substring(nameStartIndex, nameEndIndex - nameStartIndex);
-
-                    destination.Add(new ILUnit()
-                    {
-                        Name = name,
-                        NameStartIndex = offset + nameStartIndex,
-                        ParentAssembly = assembly,
-                        ParentClass = ilClass
-                    });
-                }
-
-                startIndex = index + startPhrase.Length;
-            }
-        }
+        #endregion
     }
 }
