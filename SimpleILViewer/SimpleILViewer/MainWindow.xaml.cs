@@ -13,103 +13,42 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Collections.ObjectModel;
 
 namespace SimpleILViewer
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private Dictionary<string, ItemType> _unitKeyToItemTypeMap = new Dictionary<string, ItemType>()
+        #region Assemblies
+        private ObservableCollection<TreeUIItem> _assemblies = new ObservableCollection<TreeUIItem>();
+        public ObservableCollection<TreeUIItem> Assemblies
         {
-            { "Fields", ItemType.Field },
-            { "Events", ItemType.Event },
-            { "Properties", ItemType.Property },
-            { "Methods", ItemType.Method },
-        };
-        private Dictionary<string, Func<ILClass, LinkedList<ILUnit>>> _unitNameToCollectionMap = new Dictionary<string, Func<ILClass, LinkedList<ILUnit>>>()
-        {
-            { "Fields", x => x.Fields },
-            { "Events", x => x.Events },
-            { "Properties", x => x.Properties },
-            { "Methods", x => x.Methods },
-        };
-        private Dictionary<string, TreeViewItem> _namespaces = new Dictionary<string, TreeViewItem>();
+            get
+            {
+                return _assemblies;
+            }
+            set
+            {
+                if (value != _assemblies)
+                {
+                    _assemblies = value;
+                    NotifyOfPropertyChanged();
+                }
+            }
+        }
+        #endregion
 
         private ILReader _ilReader = new ILReader();
-
+        private UITreeGenerator _treeGenerator = new UITreeGenerator();
 
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = this;
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
-        }
-
-        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            if (Directory.Exists(ILReader.ILDirectory))
-            {
-                Directory.Delete(ILReader.ILDirectory, true);
-            }
-        }
-
-        private TreeViewItem GetTreeViewItemForNamespace(Assembly assembly, string _namespace, ItemCollection root)
-        {
-            string namespaceName = _namespace.Substring(0, _namespace.LastIndexOf('.'));
-            string namespaceKey = String.Format("[{0}] {1}", assembly.FileName, namespaceName);
-
-            if (!_namespaces.ContainsKey(namespaceKey))
-            {
-                _namespaces[namespaceKey] = new TreeViewItem() { Header = namespaceName, Tag = ItemType.Namespace };
-                root.Add(_namespaces[namespaceKey]);
-            }
-
-            return _namespaces[namespaceKey];
-        }
-
-        private void DisplayStructure(IClassContainer classContainer, ItemCollection parent)
-        { 
-            foreach (var ilClass in classContainer.Classes.OrderBy(x => x.Name))
-            {
-                TreeViewItem item = new TreeViewItem() { Header = ilClass.ShortName, DataContext = ilClass, Tag = ItemType.Class };
-
-                // find a place for this class
-                if (!ilClass.Name.Contains('.'))
-                {
-                    parent.Add(item);
-                }
-                else
-                {
-                    GetTreeViewItemForNamespace(ilClass.ParentAssembly, ilClass.Name, parent).Items.Add(item);
-                }
-
-                // add methods, properties and fields
-                foreach (var unitKey in _unitNameToCollectionMap.Keys)
-                {
-                    if (!_unitNameToCollectionMap[unitKey](ilClass).Any())
-                    {
-                        continue;
-                    }
-
-                    // grouping item
-                    var unitItem = new TreeViewItem() { Header = unitKey, Tag = _unitKeyToItemTypeMap[unitKey] };
-                    item.Items.Add(unitItem);
-
-                    // all methods/properties/fields
-                    foreach (var ilUnit in _unitNameToCollectionMap[unitKey](ilClass))
-                    {
-                        var elem = new TreeViewItem() { Header = ilUnit.Name, DataContext = ilUnit, Tag = _unitKeyToItemTypeMap[unitKey] };
-                        unitItem.Items.Add(elem);
-                    }
-                }
-                
-                // add nested classes
-                if (ilClass.Classes.Any())
-                {
-                    var nestedClassesItem = new TreeViewItem() { Header = "Nested classes", Tag = ItemType.Class };
-                    item.Items.Add(nestedClassesItem);
-                    DisplayStructure(ilClass, nestedClassesItem.Items);
-                }
-            }
         }
 
         private async Task LoadAssemblies(string[] fileNames)
@@ -131,38 +70,28 @@ namespace SimpleILViewer
             ShowAssemblies(_ilReader.Assemblies.Skip(_ilReader.Assemblies.Count - fileNames.Length));
         }
 
-        private void RemoveNamespacesForAssembly(string assembly)
+        private void RemoveAssembly(TreeUIItem item)
         {
-            foreach (var key in _namespaces.Keys.ToList())
-            {
-                if (key.StartsWith(String.Format("[{0}]", assembly)))
-                {
-                    _namespaces.Remove(key);
-                }
-            }
+            Assemblies.Remove(item);
+            _treeGenerator.RemoveAssembly(item.Header);
+            _ilReader.Assemblies.Remove(_ilReader.Assemblies.FirstOrDefault(x => x.FileName == item.Header));
         }
 
         private void RemoveDuplicates(string[] fileNames)
         {
-            foreach (var item in StructureTree.Items.OfType<TreeViewItem>().ToList())
+            foreach (var assembly in Assemblies.ToList())
             {
-                if (fileNames.Any(x => item.Header as string == System.IO.Path.GetFileName(x)))
+                if (fileNames.Any(x => assembly.Header == System.IO.Path.GetFileName(x)))
                 {
-                    StructureTree.Items.Remove(item);
-                    RemoveNamespacesForAssembly(item.Header as string);
-                    _ilReader.Assemblies.Remove(_ilReader.Assemblies.FirstOrDefault(x => x.FileName == item.Header as string));
+                    RemoveAssembly(assembly);
                 }
             }
         }
 
         private void ShowAssemblies(IEnumerable<Assembly> assemblies)
         {
-            foreach (var assembly in assemblies.OrderBy(x => x.FileName))
-            {
-                var item = new TreeViewItem() { Header = assembly.FileName, Tag = ItemType.Assembly };
-                DisplayStructure(assembly, item.Items);
-                StructureTree.Items.Add(item);
-            }
+            var newCollection = Assemblies.Union(_treeGenerator.GenerateTree(assemblies)).OrderBy(x => x.Header);
+            Assemblies = new ObservableCollection<TreeUIItem>(newCollection);
         }
 
         private void ObfuscateAssemblies()
@@ -191,6 +120,14 @@ namespace SimpleILViewer
 
         #region UI event handlers
 
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (Directory.Exists(ILReader.ILDirectory))
+            {
+                Directory.Delete(ILReader.ILDirectory, true);
+            }
+        }
+
         private async void btnObfuscate_Click(object sender, RoutedEventArgs e)
         {
             if (StructureTree.Items.Count == 0)
@@ -204,8 +141,8 @@ namespace SimpleILViewer
             {
                 await Task.Run(() => ObfuscateAssemblies());
 
-                StructureTree.Items.Clear();
-                _namespaces.Clear();
+                Assemblies.Clear();
+                _treeGenerator.Clear();
                 ShowAssemblies(_ilReader.Assemblies);
             }
             catch (Exception ex)
@@ -239,7 +176,8 @@ namespace SimpleILViewer
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Could not parse some assemblies:\r\n\r\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, String.Format("Could not parse some assemblies:\r\n\r\n{0}\r\n\r\n{1}", ex.InnerException.Message, ex.InnerException.StackTrace), 
+                                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 finally
                 {
@@ -268,8 +206,8 @@ namespace SimpleILViewer
             {
                 if (obj.GetType() == typeof(TreeViewItem))
                 {
-                    var ilClass = (obj as TreeViewItem).DataContext as ILClass;
-                    var ilUnit = (obj as TreeViewItem).DataContext as ILUnit;
+                    var ilClass = ((obj as TreeViewItem).DataContext as TreeUIItem).Parent as ILClass;
+                    var ilUnit = ((obj as TreeViewItem).DataContext as TreeUIItem).Parent as ILUnit;
 
                     if (ilClass != null)
                     {
@@ -297,16 +235,25 @@ namespace SimpleILViewer
 
         private void StructureTree_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Delete)
+            var item = StructureTree.SelectedItem as TreeUIItem;
+            if (e.Key == Key.Delete && item != null && item.ItemType == ItemType.Assembly)
             {
                 e.Handled = true;
-                if (StructureTree.SelectedItem != null)
-                {
-                    string assemblyName = (StructureTree.SelectedItem as TreeViewItem).Header as string;
-                    _ilReader.Assemblies.Remove(_ilReader.Assemblies.FirstOrDefault(x => x.FileName == assemblyName));
-                    RemoveNamespacesForAssembly(assemblyName);
-                    StructureTree.Items.Remove(StructureTree.SelectedItem);
-                }
+                RemoveAssembly(item);
+            }
+        }
+
+        #endregion
+
+        #region INotifyPropertyChanged
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void NotifyOfPropertyChanged([CallerMemberName]string propertyName = null)
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
             }
         }
 

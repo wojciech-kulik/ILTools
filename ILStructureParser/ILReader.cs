@@ -12,8 +12,8 @@ namespace ILStructureParser
     {
         private class ParallelJob
         {
-            public int Offset { get; set; }
-            public string ILCode { get; set; }
+            public int StartIndex { get; set; }
+            public int EndIndex { get; set; }
         }
 
         public const string ILDirectory = "ILFiles";
@@ -54,7 +54,7 @@ namespace ILStructureParser
             Process.Start(new ProcessStartInfo()
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
-                Arguments = String.Format("\"{0}\" /out:{1}", filePath, ilFileName),
+                Arguments = String.Format("\"{0}\" /nobar /out:{1}", filePath, ilFileName),
                 FileName = ildasmPath
             }).WaitForExit();
 
@@ -81,7 +81,7 @@ namespace ILStructureParser
                 {
                     results.Add(new ILClass());
                     var result = results.Last();
-                    tasks.Add(Task.Run(() => ParseClasses(assembly, result, job.ILCode, job.Offset)));
+                    tasks.Add(Task.Run(() => ParseClasses(assembly, result, assembly.ILCode.Substring(job.StartIndex, job.EndIndex - job.StartIndex), job.StartIndex)));
                 }
                 
                 Task.WaitAll(tasks.ToArray());
@@ -111,18 +111,25 @@ namespace ILStructureParser
             var result = new List<ParallelJob>();
             int offset = 0;
             int partLength = ilCode.Length / Environment.ProcessorCount;
+            var fms = new ILFMS();
 
-            for (int i = 0; i < Environment.ProcessorCount - 1 && partLength < ilCode.Length; i++)
+            for (int i = 0; i < Environment.ProcessorCount - 1; i++)
             {
                 // look for the nearest (to division point) not nested class to split in this place
-                int endIndex = partLength;
-                while ((endIndex = ilCode.IndexOf(ClassIdentifier, endIndex)) != -1)
+                int endIndex = -1;
+                for (int j = offset + partLength; j < ilCode.Length; j++)
                 {
-                    if (!IsNestedClass(ilCode, endIndex))
+                    fms.GoToNextState(ilCode[j]);
+
+                    if (fms.CurrentState.IsFinal)
                     {
-                        break;
+                        if (fms.CurrentState.StateId == ILFMS.StateIdentifier.Class && !IsNestedClass(ilCode, j))
+                        {
+                            endIndex = j - ClassIdentifier.Length - 1;
+                            break;
+                        }
+                        fms.Restart();
                     }
-                    endIndex += ClassIdentifier.Length;
                 }
 
                 if (endIndex == -1)
@@ -130,11 +137,11 @@ namespace ILStructureParser
                     break;
                 }
 
-                result.Add(new ParallelJob() { ILCode = ilCode.Substring(0, endIndex), Offset = offset });
-                ilCode = ilCode.Substring(endIndex);
-                offset += endIndex;
+                result.Add(new ParallelJob() { StartIndex = offset, EndIndex = endIndex });
+                offset = endIndex;
+                fms.Restart();
             }
-            result.Add(new ParallelJob() { ILCode = ilCode, Offset = offset });
+            result.Add(new ParallelJob() { StartIndex = offset, EndIndex = ilCode.Length - 1 });
 
             return result;
         }
@@ -148,6 +155,7 @@ namespace ILStructureParser
         private void ParseClasses(Assembly assembly, IClassContainer classContainer, string ilCode, int offset = 0)
         {
             bool newLine = false;
+            bool comment = false;
             var length = ilCode.Length;
             var fms = new ILFMS();
             ILClass currentClass = null;
@@ -205,21 +213,33 @@ namespace ILStructureParser
 
                     fms.Restart();
                 }
-                else if (ilCode[i] == '\n')
+                else if (i + 1 < length && ilCode[i] == '/' && ilCode[i + 1] == '/') //to skip comments next to custom attributes
                 {
-                    newLine = true;
+                    comment = true;
                 }
-                else if (currentClass != null && ilCode[i] == '{')
+                else if (comment && ilCode[i] == '\n')
                 {
-                    currentClass.BracketsCounter++;
-                    newLine = false;
+                    comment = false;
                 }
-                else if (currentClass != null && ilCode[i] == '}')
+                else if (!comment && currentClass != null)
                 {
-                    if (--currentClass.BracketsCounter == 0 && newLine) //closing bracket should be in another line then the opening one
+                    // look for class end
+                    if (ilCode[i] == '\n')
                     {
-                        currentClass.EndIndex = offset + i + 1;
-                        currentClass = currentClass.ParentClass;
+                        newLine = true;
+                    }
+                    else if (ilCode[i] == '{')
+                    {
+                        currentClass.BracketsCounter++;
+                        newLine = false;
+                    }
+                    else if (ilCode[i] == '}')
+                    {
+                        if (--currentClass.BracketsCounter == 0 && newLine) //closing bracket should be in another line then the opening one
+                        {
+                            currentClass.EndIndex = offset + i + 1;
+                            currentClass = currentClass.ParentClass;
+                        }
                     }
                 }
             }
@@ -266,6 +286,28 @@ namespace ILStructureParser
             return -1;
         }
 
+        private int LastIndexOfSkipGeneric(string source, char value, int startIndex, int endIndex)
+        {
+            int bracketsCounter = 0;
+            for (int i = endIndex; i >= startIndex; i--)
+            {
+                if (source[i] == '<' && bracketsCounter > 0)
+                {
+                    bracketsCounter--;
+                }
+                else if (source[i] == '>')
+                {
+                    bracketsCounter++;
+                }
+                else if (source[i] == value && bracketsCounter == 0)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
         private Tuple<int, string> ExtractClassName(string ilCode, int index, int lastIndex)
         {
             var genericCharIndex = ilCode.IndexOf('`', index, lastIndex - index);
@@ -277,7 +319,7 @@ namespace ILStructureParser
                     ++lastIndex;
                 }
             }
-            var nameIndex = LastIndexOf(ilCode, ' ', index, lastIndex);
+            var nameIndex = LastIndexOfSkipGeneric(ilCode, ' ', index, lastIndex);
 
             if (nameIndex != -1)
             {

@@ -13,19 +13,14 @@
     <Window.Resources>
         <conv:ILUnitToImageConverter x:Key="ILUnitToImageConverter" />
 
-        <Style TargetType="{x:Type TreeViewItem}">
-            <Setter Property="HeaderTemplate">
-                <Setter.Value>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <Image Name="img"  Width="16" Height="16" Stretch="Fill" 
-                                   Source="{Binding ., RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type TreeViewItem}}, Converter={StaticResource ILUnitToImageConverter}}"/>
-                            <TextBlock Text="{Binding}" Margin="5,0"/>
-                        </StackPanel>
-                    </DataTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <HierarchicalDataTemplate x:Key="TreeViewItemTemplate" ItemsSource="{Binding Items}">
+            <Border Padding="1">
+                <StackPanel Orientation="Horizontal">
+                    <Image Name="img" Width="16" Height="16" Stretch="Fill" Source="{Binding ItemType, Converter={StaticResource ILUnitToImageConverter}}"/>
+                    <TextBlock Text="{Binding Header}" Margin="5,-1,5,0"/>
+                </StackPanel>
+            </Border>
+        </HierarchicalDataTemplate>
 
         <Storyboard x:Key="LoadingAnimation" Storyboard.TargetName="LoadingStatus" Storyboard.TargetProperty="Width">
             <DoubleAnimation BeginTime="0:0:0" To="58" Duration="0:0:0.75" RepeatBehavior="Forever" />
@@ -34,6 +29,8 @@
         <Storyboard x:Key="IconRotationAnimation" Storyboard.TargetName="LoadingIcon" Storyboard.TargetProperty="(Image.RenderTransform).(RotateTransform.Angle)">
             <DoubleAnimation BeginTime="0:0:0" To="360" Duration="0:0:1.4" RepeatBehavior="Forever" />
         </Storyboard>
+        
+        <SolidColorBrush x:Key="ListBorder" Color="#828790"/>
     </Window.Resources>
 
     <Grid>
@@ -56,15 +53,17 @@
             <Button x:Name="btnObfuscate" Grid.Column="1" Height="30" Content="Obfuscate" Click="btnObfuscate_Click" Margin="-1,0,0,0" />
         </Grid>
 
-        <TreeView x:Name="StructureTree" Grid.Row="1" FontSize="15" Background="#FFEEEEEE" BorderThickness="0"
+        <TreeView x:Name="StructureTree" Grid.Row="1" FontSize="14" Background="#FFEEEEEE" BorderThickness="0"
                   PreviewMouseDoubleClick="StructureTree_PreviewMouseDoubleClick"
-                  KeyDown="StructureTree_KeyDown"/>
+                  KeyDown="StructureTree_KeyDown"
+                  ItemTemplate="{StaticResource TreeViewItemTemplate}"
+                  ItemsSource="{Binding Assemblies}"/>
 
         <Border Grid.Column="1" Grid.RowSpan="2">
             <Border.Background>
                 <ImageBrush ImageSource="/Images/binding_dark.png" TileMode="Tile" ViewportUnits="Absolute" Viewport="0,0,46,23"/>
             </Border.Background>
-        
+
             <TextBox x:Name="tbSourceCode" 
                          IsReadOnly="True" AcceptsReturn="True" AcceptsTab="True" 
                          Padding="20" Foreground="White" 
@@ -86,7 +85,7 @@
                 </Image>
             </StatusBarItem>
             <StatusBarItem x:Name="LoadingStatus" Content="Loading..." Width="48" HorizontalAlignment="Left" Visibility="Collapsed"/>
-            
+
             <StatusBarItem HorizontalAlignment="Right" Margin="0,0,5,0">
                 <Hyperlink NavigateUri="http://wojciechkulik.pl" TextDecorations="None" RequestNavigate="Hyperlink_RequestNavigate">
                     <Span Foreground="Black">author:</Span> wojciechkulik.pl

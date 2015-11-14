@@ -10,7 +10,7 @@ namespace SimpleILViewer.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var itemType = (value as TreeViewItem).Tag.ToString().ToLower();
+            var itemType = ((ItemType)value).ToString().ToLower();
             return new BitmapImage(new Uri(String.Format("/SimpleILViewer;component/Images/{0}.png", itemType), UriKind.Relative));
         }
 

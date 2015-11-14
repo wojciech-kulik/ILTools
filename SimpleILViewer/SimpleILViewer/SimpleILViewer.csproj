@@ -58,6 +58,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="UITreeGenerator\TreeUIItem.cs" />
+    <Compile Include="UITreeGenerator\UITreeGenerator.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -67,7 +69,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Converters\ILUnitToImageConverter.cs" />
-    <Compile Include="ItemType.cs" />
+    <Compile Include="UITreeGenerator\ItemType.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
