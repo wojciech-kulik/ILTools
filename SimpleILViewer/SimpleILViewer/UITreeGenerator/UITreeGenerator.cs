@@ -37,7 +37,7 @@ namespace SimpleILViewer
             return _namespaces[namespaceKey];
         }
 
-        private void GenerateDisplayStructure(IClassContainer classContainer, LinkedList<TreeUIItem> parent)
+        private void GenerateStructure(IClassContainer classContainer, LinkedList<TreeUIItem> parent)
         {
             foreach (var ilClass in classContainer.Classes.OrderBy(x => x.Name))
             {
@@ -80,7 +80,7 @@ namespace SimpleILViewer
                 {
                     var nestedClassesItem = new TreeUIItem() { Header = "Nested classes", ItemType = ItemType.Class };
                     item.Items.AddLast(nestedClassesItem);
-                    GenerateDisplayStructure(ilClass, nestedClassesItem.Items); // recursive call for nested classes
+                    GenerateStructure(ilClass, nestedClassesItem.Items); // recursive call for nested classes
                 }
             }
         }
@@ -102,7 +102,7 @@ namespace SimpleILViewer
             foreach (var assembly in assemblies.OrderBy(x => x.FileName))
             {
                 var item = new TreeUIItem() { Header = assembly.FileName, ItemType = ItemType.Assembly };
-                GenerateDisplayStructure(assembly, item.Items);
+                GenerateStructure(assembly, item.Items);
                 items.Add(item);
             }
 
