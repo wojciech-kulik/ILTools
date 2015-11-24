@@ -69,7 +69,8 @@
                          Padding="20" Foreground="White" 
                          TextWrapping="NoWrap" BorderThickness="0"
                          FontFamily="Consolas" FontSize="15"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         TextBlock.LineHeight="19" TextBlock.LineStackingStrategy="BlockLineHeight">
                 <TextBox.Background>
                     <SolidColorBrush Color="#FF293BB0" Opacity="0.2"/>
                 </TextBox.Background>

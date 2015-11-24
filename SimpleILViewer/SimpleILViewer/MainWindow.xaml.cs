@@ -221,8 +221,9 @@ namespace SimpleILViewer
                         ilClass = ilUnit.ParentClass;
                         tbSourceCode.Text = ilClass.ParentAssembly.ILCode.Substring(ilClass.StartIndex, ilClass.EndIndex - ilClass.StartIndex);
 
+                        var lineHeight = TextBlock.GetLineHeight(tbSourceCode);
                         int line = tbSourceCode.GetLineIndexFromCharacterIndex(ilUnit.NameStartIndex - ilClass.StartIndex);
-                        tbSourceCode.ScrollToLine(line);
+                        tbSourceCode.ScrollToVerticalOffset(lineHeight * line);
 
                         e.Handled = true;
                         break;
